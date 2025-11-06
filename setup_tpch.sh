@@ -185,7 +185,10 @@ echo "Loading TPCH data (this may take a while for large scale factors)..."
 for table in region nation customer supplier part partsupp orders lineitem; do
     echo "  Loading ${table}..."
     if [ -f "${table}.tbl" ]; then
-        "${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} -U ${DB_USER} -c "\COPY ${table} FROM '${SCRIPT_DIR}/${table}.tbl' DELIMITER '|';"
+        # Strip trailing delimiter from TPCH data files (they end with |)
+        sed 's/|$//' "${SCRIPT_DIR}/${table}.tbl" > "${SCRIPT_DIR}/${table}.tbl.tmp"
+        "${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} -U ${DB_USER} -c "\COPY ${table} FROM '${SCRIPT_DIR}/${table}.tbl.tmp' DELIMITER '|';"
+        rm "${SCRIPT_DIR}/${table}.tbl.tmp"
     fi
 done
 
