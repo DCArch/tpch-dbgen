@@ -28,5 +28,9 @@ TARGET_MEMORY_GB="${TARGET_MEMORY_GB:-128}"
 # Leave empty to run all queries, or specify comma-separated list like "1,3,6,12"
 QUERIES_TO_RUN="${QUERIES_TO_RUN:-}"
 
+# Warmup iterations before starting simulation (similar to TPCC's 25% warmup)
+# This ensures we capture steady-state behavior, not cold-start disk I/O
+WARMUP_ITERATIONS="${WARMUP_ITERATIONS:-1}"
+
 # Number of parallel streams (optional, for throughput test)
 NUM_STREAMS="${NUM_STREAMS:-1}"

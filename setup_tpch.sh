@@ -171,6 +171,12 @@ CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 EOF
 
+# Create DCSim extension as superuser
+echo "Creating DCSim extension..."
+"${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} <<EOF
+CREATE EXTENSION IF NOT EXISTS dcsim;
+EOF
+
 # Step 5: Create TPCH schema and load data
 echo ""
 echo "Step 5: Creating TPCH schema and loading data..."

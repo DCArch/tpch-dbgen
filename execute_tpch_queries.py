@@ -45,47 +45,71 @@ def read_query_file(query_file):
 
 def activate_dcsim(conn):
     """Activate DCSim simulation hooks"""
-    print("\n" + "="*60)
-    print("ACTIVATING DCSIM SIMULATION HOOKS")
-    print("="*60)
-
+    print("\nTPCH: Starting simulation")
     cur = conn.cursor()
     try:
-        # Create extension if it doesn't exist
-        print("Creating dcsim extension...")
-        cur.execute("CREATE EXTENSION IF NOT EXISTS dcsim;")
-        conn.commit()
-
-        # Start simulation
-        print("Starting simulation...")
         cur.execute("SELECT dcsim_start_simulation();")
         conn.commit()
-
-        print("DCSim simulation started successfully")
-        print("="*60 + "\n")
     except Exception as e:
-        print(f"Error activating DCSim: {e}")
+        print(f"TPCH ERROR: Failed to start simulation: {e}")
         raise
     finally:
         cur.close()
 
 def deactivate_dcsim(conn):
     """Deactivate DCSim simulation hooks"""
-    print("\n" + "="*60)
-    print("DEACTIVATING DCSIM SIMULATION HOOKS")
-    print("="*60)
-
+    print("\nTPCH: Ending simulation")
     cur = conn.cursor()
     try:
         cur.execute("SELECT dcsim_end_simulation();")
         conn.commit()
-        print("DCSim simulation ended successfully")
-        print("="*60 + "\n")
     except Exception as e:
-        print(f"Error deactivating DCSim: {e}")
+        print(f"TPCH ERROR: Failed to end simulation: {e}")
         raise
     finally:
         cur.close()
+
+def warmup_phase(conn, query_dir, queries_to_run=None, warmup_iterations=1):
+    """
+    Run warmup queries to populate PostgreSQL buffer cache.
+    This ensures we simulate steady-state behavior, not cold-start disk I/O.
+    Similar to TPCC's 25% warmup period before activating hooks.
+    """
+    if queries_to_run is None:
+        queries_to_run = range(1, 23)  # TPCH has 22 queries
+
+    # Use a subset of queries for warmup (lighter queries)
+    warmup_queries = [1, 3, 6, 12, 14]
+    warmup_queries = [q for q in warmup_queries if q in queries_to_run]
+
+    print("\nTPCH: Warmup phase - populating buffer cache")
+    print(f"Running {len(warmup_queries)} queries {warmup_iterations} time(s)")
+
+    cur = conn.cursor()
+
+    for iteration in range(warmup_iterations):
+        print(f"\nWarmup iteration {iteration + 1}/{warmup_iterations}:")
+        for qnum in warmup_queries:
+            query_file = os.path.join(query_dir, f"{qnum}.sql")
+            if not os.path.exists(query_file):
+                continue
+
+            try:
+                query = read_query_file(query_file)
+                print(f"  Running warmup query {qnum}...", end='', flush=True)
+                start_time = time.time()
+                cur.execute(query)
+                cur.fetchall()  # Consume results
+                elapsed = time.time() - start_time
+                print(f" completed in {elapsed:.2f}s")
+            except Exception as e:
+                print(f" FAILED: {e}")
+                conn.rollback()
+
+        conn.commit()
+
+    cur.close()
+    print("TPCH: Warmup complete")
 
 def run_tpch_queries(conn, query_dir, queries_to_run=None):
     """
@@ -185,6 +209,10 @@ def main():
                        help='Directory containing TPCH query SQL files')
     parser.add_argument('--queries', type=str, default=None,
                        help='Comma-separated list of query numbers to run (default: all)')
+    parser.add_argument('--warmup-iterations', type=int, default=1,
+                       help='Number of warmup iterations to run before starting simulation (default: 1)')
+    parser.add_argument('--skip-warmup', action='store_true',
+                       help='Skip warmup phase (not recommended - will capture cold-start I/O)')
     parser.add_argument('--output', type=str, default=None,
                        help='Output file for results (JSON format)')
 
@@ -212,6 +240,12 @@ def main():
         return 1
 
     try:
+        # Warmup phase - populate buffer cache before starting simulation
+        if not args.skip_warmup:
+            warmup_phase(conn, args.query_dir, queries_to_run, args.warmup_iterations)
+        else:
+            print("\nWARNING: Skipping warmup phase - simulation will include cold-start I/O")
+
         # Activate DCSim hooks
         activate_dcsim(conn)
 

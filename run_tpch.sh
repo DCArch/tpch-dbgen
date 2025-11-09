@@ -17,6 +17,8 @@
 #   --db-password PASS      Database password (default: changeme)
 #   --queries LIST          Comma-separated query numbers (default: all)
 #   --run-id ID             Run ID for results file (default: 1)
+#   --warmup-iterations N   Number of warmup iterations (default: 1)
+#   --skip-warmup           Skip warmup phase (not recommended)
 #   --help                  Show this help message
 
 set -e  # Exit on error
@@ -26,6 +28,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load default configuration (sets defaults via environment variable fallbacks)
 source "${SCRIPT_DIR}/tpch_config.sh"
+
+# Default warmup iterations
+WARMUP_ITERATIONS="${WARMUP_ITERATIONS:-1}"
+SKIP_WARMUP=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -66,8 +72,16 @@ while [[ $# -gt 0 ]]; do
             RUN_ID="$2"
             shift 2
             ;;
+        --warmup-iterations)
+            WARMUP_ITERATIONS="$2"
+            shift 2
+            ;;
+        --skip-warmup)
+            SKIP_WARMUP=true
+            shift
+            ;;
         --help)
-            head -n 20 "$0" | grep "^#" | sed 's/^# //'
+            head -n 22 "$0" | grep "^#" | sed 's/^# //'
             exit 0
             ;;
         *)
@@ -152,6 +166,12 @@ if [ -n "${QUERIES_TO_RUN}" ]; then
     QUERY_PARAM="--queries ${QUERIES_TO_RUN}"
 fi
 
+# Build warmup parameters
+WARMUP_PARAM="--warmup-iterations ${WARMUP_ITERATIONS}"
+if [ "$SKIP_WARMUP" = true ]; then
+    WARMUP_PARAM="--skip-warmup"
+fi
+
 python3 "${SCRIPT_DIR}/execute_tpch_queries.py" \
     --host ${DB_HOST} \
     --port ${DB_PORT} \
@@ -160,7 +180,8 @@ python3 "${SCRIPT_DIR}/execute_tpch_queries.py" \
     --password ${DB_PASSWORD} \
     --query-dir "${SCRIPT_DIR}/queries" \
     --output "${RESULT_FILE}" \
-    ${QUERY_PARAM}
+    ${QUERY_PARAM} \
+    ${WARMUP_PARAM}
 
 # Step 5: Stop PostgreSQL
 echo ""
