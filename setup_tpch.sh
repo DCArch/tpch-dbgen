@@ -161,25 +161,26 @@ echo "Starting PostgreSQL..."
 "${POSTGRES_BIN}/pg_ctl" -D "${POSTGRES_DATA}" -l "${POSTGRES_DATA}/logfile" start
 sleep 3
 
-# Step 4: Create database and user
+# Step 4: Create DCSim extension in template1 (so all new databases inherit it)
 echo ""
-echo "Step 4: Creating database and user..."
+echo "Step 4: Creating DCSim extension in template1..."
 export LD_LIBRARY_PATH="${POSTGRES_LIB}"
+"${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d template1 <<EOF
+CREATE EXTENSION IF NOT EXISTS dcsim;
+EOF
+
+# Step 5: Create database and user (will inherit extension from template1)
+echo ""
+echo "Step 5: Creating database and user..."
 "${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d postgres <<EOF
 CREATE USER ${DB_USER} WITH ENCRYPTED PASSWORD '${DB_PASSWORD}';
 CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 EOF
 
-# Create DCSim extension as superuser
-echo "Creating DCSim extension..."
-"${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} <<EOF
-CREATE EXTENSION IF NOT EXISTS dcsim;
-EOF
-
-# Step 5: Create TPCH schema and load data
+# Step 6: Create TPCH schema and load data
 echo ""
-echo "Step 5: Creating TPCH schema and loading data..."
+echo "Step 6: Creating TPCH schema and loading data..."
 cd "${SCRIPT_DIR}"
 
 # Create tables
@@ -206,9 +207,9 @@ echo "Creating indexes and foreign keys..."
 echo "Analyzing tables..."
 "${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} -U ${DB_USER} -c "ANALYZE;"
 
-# Step 6: Run warmup queries
+# Step 7: Run warmup queries
 echo ""
-echo "Step 6: Running warmup queries to reach ${TARGET_MEMORY_GB}GB memory usage..."
+echo "Step 7: Running warmup queries to reach ${TARGET_MEMORY_GB}GB memory usage..."
 export PGPASSWORD="${DB_PASSWORD}"
 python3 "${SCRIPT_DIR}/warmup_tpch.py" \
     --host ${DB_HOST} \
@@ -220,9 +221,9 @@ python3 "${SCRIPT_DIR}/warmup_tpch.py" \
     --warmup-rounds ${WARMUP_ROUNDS} \
     --target-memory ${TARGET_MEMORY_GB}
 
-# Step 7: Stop PostgreSQL and save data directory
+# Step 8: Stop PostgreSQL and save data directory
 echo ""
-echo "Step 7: Saving database state..."
+echo "Step 8: Saving database state..."
 "${POSTGRES_BIN}/pg_ctl" -D "${POSTGRES_DATA}" stop
 sleep 2
 
