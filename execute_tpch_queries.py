@@ -235,6 +235,16 @@ def main():
         )
         conn.autocommit = False
         print("Connected successfully")
+
+        # Configure PostgreSQL for parallel query execution
+        cur = conn.cursor()
+        cur.execute("SET max_parallel_workers_per_gather = 64;")
+        cur.execute("SET max_parallel_workers = 128;")
+        cur.execute("SET parallel_setup_cost = 0;")  # Encourage parallelism
+        cur.execute("SET parallel_tuple_cost = 0;")   # Encourage parallelism
+        conn.commit()
+        cur.close()
+        print("Configured PostgreSQL for parallel execution (64 workers per query)")
     except Exception as e:
         print(f"Failed to connect to database: {e}")
         return 1
