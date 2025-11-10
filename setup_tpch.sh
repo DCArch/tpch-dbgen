@@ -199,9 +199,9 @@ for table in region nation customer supplier part partsupp orders lineitem; do
     fi
 done
 
-# Create indexes and constraints (from dss.ri)
-echo "Creating indexes and foreign keys..."
-"${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} -U ${DB_USER} -f dss.ri
+# Create indexes and constraints (PostgreSQL-compatible version)
+echo "Creating primary keys and foreign key constraints..."
+"${POSTGRES_BIN}/psql" -h ${DB_HOST} -p ${DB_PORT} -d ${DB_NAME} -U ${DB_USER} -f dss.ri.pgsql
 
 # Run ANALYZE to update statistics
 echo "Analyzing tables..."
